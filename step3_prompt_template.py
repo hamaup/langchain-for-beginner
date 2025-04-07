@@ -3,14 +3,15 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-# --- プロンプト関連の道具をインポート ---
-from langchain_core.prompts import PromptTemplate
-from langchain_core.prompts import (
+# --- プロンプト関連の道具をインポート (langchain.prompts) ---
+from langchain.prompts import (
+    PromptTemplate,
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate
+    HumanMessagePromptTemplate,
 )
-from langchain_core.messages import AIMessage, HumanMessage
+# --- メッセージクラスをインポート (langchain.schema) ---
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
 # 環境変数の読み込み
 load_dotenv()
@@ -39,8 +40,6 @@ input_data = {
 final_prompt_string = prompt_template.format(**input_data)
 print("【生成されたプロンプト文字列】:")
 print(final_prompt_string)
-print("\n【LLMへの入力 (文字列)】:")
-print(final_prompt_string)
 response = llm.invoke(final_prompt_string)
 print("\n【LLMからの応答 (PromptTemplate)】:")
 print(response.content)
@@ -61,37 +60,41 @@ chat_input_data = {
 final_prompt_messages = chat_template.format_messages(**chat_input_data)
 print("【生成されたプロンプトメッセージ (リスト)】:")
 print(final_prompt_messages)
-print("\n【LLMへの入力 (メッセージリスト)】:")
-print(final_prompt_messages)
 response_chat = llm.invoke(final_prompt_messages)
 print("\n【LLMからの応答 (ChatPromptTemplate 基本)】:")
 print(response_chat.content)
 
-# --- ChatPromptTemplate のテスト (Few-shot) ---
-print("\n--- ChatPromptTemplate のテスト (Few-shot) ---")
-message_templates = [
-    SystemMessagePromptTemplate.from_template("あなたはユーザーの質問に簡潔に一言で答えるアシスタントです。"),
-    # --- ここから Few-shot のお手本 ---
-    HumanMessage(content="今日の天気は？"),
-    AIMessage(content="晴れです。"),
-    HumanMessage(content="明日の天気は？"),
-    AIMessage(content="曇り時々雨です。"),
-    # --- ここまで Few-shot のお手本 ---
-    # --- 実際にユーザーが質問する部分（ここには変数が必要） ---
-    HumanMessagePromptTemplate.from_template("{user_question}")
+# --- ChatPromptTemplate のテスト (Few-shot: 感情分析) ---
+print("\n--- ChatPromptTemplate のテスト (Few-shot: 感情分析) ---")
+messages_for_sentiment_analysis = [
+    # AIの役割設定
+    SystemMessage(content="あなたは与えられた文章の感情を分析し、「ポジティブ」または「ネガティブ」のどちらか一言で分類するAIです。"),
+    # お手本1
+    HumanMessage(content="文章: 「この映画は最高でした！」\n感情:"),
+    AIMessage(content="ポジティブ"),
+    # お手本2
+    HumanMessage(content="文章: 「サービスがとても遅く、食事も冷めていました。」\n感情:"),
+    AIMessage(content="ネガティブ"),
+    # お手本3
+    HumanMessage(content="文章: 「新しい職場は雰囲気が良く、同僚も親切です。」\n感情:"),
+    AIMessage(content="ポジティブ"),
+    # 実際のユーザーリクエスト (テンプレート)
+    HumanMessagePromptTemplate.from_template("文章: 「{input_sentence}」\n感情:")
 ]
-few_shot_template = ChatPromptTemplate.from_messages(message_templates)
-# 質問例を変更
-few_shot_input_data = {
-    "user_question": "おすすめのプログラミング言語は？"
+sentiment_analysis_template = ChatPromptTemplate.from_messages(messages_for_sentiment_analysis)
+# 分類対象の文章
+sentiment_input_data = {
+    "input_sentence": "昨日の会議は長すぎて退屈でした。"
 }
-final_few_shot_messages = few_shot_template.format_messages(**few_shot_input_data)
-print("【生成されたプロンプトメッセージ (Few-shot)】:")
-print(final_few_shot_messages)
-print("\n【LLMへの入力 (Few-shot メッセージリスト)】:")
-print(final_few_shot_messages)
-response_few_shot = llm.invoke(final_few_shot_messages)
+final_sentiment_messages = sentiment_analysis_template.format_messages(**sentiment_input_data)
+print("【生成されたプロンプトメッセージ (Few-shot)】: (Systemと最後のHumanのみ表示)")
+print(final_sentiment_messages[0]) # System Message
+print("...") # お手本部分は省略
+print(final_sentiment_messages[-1]) # 最後の Human Message (テンプレート適用後)
+
+response_sentiment = llm.invoke(final_sentiment_messages)
 print("\n【LLMからの応答 (ChatPromptTemplate Few-shot)】:")
-print(response_few_shot.content)
+# お手本に倣って「ネガティブ」という応答が期待される
+print(response_sentiment.content)
 
 print("\n--- 処理終了 ---")
